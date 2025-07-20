@@ -1,90 +1,93 @@
-# Lightweight ST7735 driver for MicroPython
-
 import time
 import framebuf
+import machine
+import config  # Your configuration file with the pin definitions
 
-class ST7735(framebuf.FrameBuffer):
-    def __init__(self, spi, width, height, reset, dc, cs, rotation=0):
-        self.spi = spi
+class ST7735S:
+    def __init__(self, width=128, height=160):
+        """
+        Initialize ST7735S display controller using pins from config
+        
+        Args:
+            width: Display width (default 128)
+            height: Display height (default 160)
+        """
         self.width = width
         self.height = height
-        self.dc = dc
-        self.cs = cs
-        self.reset = reset
-        self.rotation = rotation
-
-        self.buffer = bytearray(self.height * self.width * 2)
-        super().__init__(self.buffer, self.width, self.height, framebuf.RGB565)
-
-        self.dc.init(self.dc.OUT, value=0)
-        self.cs.init(self.cs.OUT, value=1)
-        self.reset.init(self.reset.OUT, value=1)
-
-        self.init()
-
-    def init(self):
-        self.reset.value(0)
-        time.sleep_ms(50)
-        self.reset.value(1)
-        time.sleep_ms(50)
-
-        for cmd, data in (
-            (0x01, b''),       # Software reset
-            (0x11, b''),       # Sleep out
-            (0x3A, b'\x05'),   # 16-bit color
-            (0x36, b'\xC8'),   # MADCTL (rotation config)
-            (0x29, b''),       # Display ON
-        ):
+        
+        # Initialize SPI and pins from config
+        self.spi = machine.SPI(1,
+                              baudrate=20_000_000,
+                              polarity=0,
+                              phase=0,
+                              sck=machine.Pin(config.TFT_SCK),
+                              mosi=machine.Pin(config.TFT_MOSI))
+        
+        self.dc = machine.Pin(config.TFT_DC, machine.Pin.OUT)
+        self.rst = machine.Pin(config.TFT_RST, machine.Pin.OUT)
+        self.cs = machine.Pin(config.TFT_CS, machine.Pin.OUT)
+        
+        # Initialize display
+        self.reset()
+        self.init_display()
+        
+        # Create framebuffer
+        self.buffer = bytearray(self.width * self.height * 2)
+        self.framebuf = framebuf.FrameBuffer(self.buffer, self.width, self.height, framebuf.RGB565)
+    
+    def write_cmd(self, cmd):
+        """Write command to display"""
+        self.dc(0)
+        self.cs(0)
+        self.spi.write(bytearray([cmd]))
+        self.cs(1)
+    
+    def write_data(self, data):
+        """Write data to display"""
+        self.dc(1)
+        self.cs(0)
+        self.spi.write(data)
+        self.cs(1)
+    
+    def reset(self):
+        """Hardware reset"""
+        self.rst(1)
+        time.sleep_ms(5)
+        self.rst(0)
+        time.sleep_ms(20)
+        self.rst(1)
+        time.sleep_ms(150)
+    
+    def init_display(self):
+        """Initialize display with basic commands"""
+        # Initialization sequence
+        cmds = [
+            (0x01, None, 150),  # SWRESET, 150ms delay
+            (0x11, None, 255),  # SLPOUT, 255ms delay
+            (0x3A, b'\x05', 10),  # COLMOD, 16-bit color
+            (0x36, b'\xC0', 0),   # MADCTL, RGB color filter
+            (0x29, None, 255),    # DISPON, 255ms delay
+        ]
+        
+        for cmd, data, delay in cmds:
             self.write_cmd(cmd)
             if data:
                 self.write_data(data)
-            time.sleep_ms(10)
-
-    def write_cmd(self, cmd):
-        self.dc.value(0)
-        self.cs.value(0)
-        self.spi.write(bytearray([cmd]))
-        self.cs.value(1)
-
-    def write_data(self, data):
-        self.dc.value(1)
-        self.cs.value(0)
-        self.spi.write(data)
-        self.cs.value(1)
-
-    def show(self):
-        self.write_cmd(0x2A)
-        self.write_data(bytearray([0x00, 0, 0x00, self.width - 1]))
-        self.write_cmd(0x2B)
-        self.write_data(bytearray([0x00, 0, 0x00, self.height - 1]))
-        self.write_cmd(0x2C)
-        self.dc.value(1)
-        self.cs.value(0)
-        self.spi.write(self.buffer)
-        self.cs.value(1)
+            if delay:
+                time.sleep_ms(delay)
     
-    def clear(self):
-    # Fill the buffer with 0 (black)
-        for i in range(len(self.buffer)):
-            self.buffer[i] = 0
-        self.show()
+    def show(self):
+        """Display the framebuffer on screen"""
+        self.write_cmd(0x2A)  # Column address set
+        self.write_data(bytes([0, 0, 0, self.width-1]))
         
-'''
-    def fill(self, color):
-        # Fill the buffer with the specified color
-        for i in range(0, len(self.buffer), 2):
-            self.buffer[i] = (color >> 8) & 0xFF
-            self.buffer[i + 1] = color & 0xFF
-        self.show()
+        self.write_cmd(0x2B)  # Row address set
+        self.write_data(bytes([0, 0, 0, self.height-1]))
         
-    def text(self, string, x, y, color):
-        # Simple text rendering (not fully implemented)
-        for i, char in enumerate(string):
-            if x + i * 8 < self.width and y < self.height:
-                # Draw a simple pixel for each character (placeholder)
-                self.buffer[(y * self.width + (x + i * 8)) * 2] = (color >> 8) & 0xFF
-                self.buffer[(y * self.width + (x + i * 8)) * 2 + 1] = color & 0xFF
+        self.write_cmd(0x2C)  # Memory write
+        self.write_data(self.buffer)
+    
+    def clear(self, color=0):
+        """Clear the display with specified color"""
+        self.framebuf.fill(color)
         self.show()
-'''
-
-
