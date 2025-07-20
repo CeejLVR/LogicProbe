@@ -9,8 +9,6 @@ CALIBRATION = {
     'frequency': 2,
 }
 
-# Auto-sample time based on expected frequency
-# Not yet implimented
 def auto_sample_time(freq_hz):
     """Adjust sample time based on expected frequency."""
     if freq_hz < 100:
@@ -186,3 +184,4 @@ class CpuEdgeCounter:
 
     def get_result(self):
         return self.edge_count if self.result_ready else None
+
