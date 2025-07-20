@@ -1,91 +1,140 @@
-# display.py — For ST7735 1.8" TFT over SPI
-
-from st7735 import ST7735
-from machine import Pin, SPI
-from time import ticks_ms
+# display.py — Clean UI for ST7735 TFT Logic Probe
+from st7735 import ST7735S
 import config
+import framebuf
+import time
 
+# Initialize display with optimized settings
+tft = ST7735S(width=128, height=160)
+tft.spi.init(baudrate=30_000_000)  # Increased SPI speed
 
-# --- CONFIGURED PINS TO MATCH MY SETUP ---
-TFT_SCK = config.TFT_SCK   # SCL (SPI Clock)
-TFT_MOSI = config.TFT_MOSI  # SDA (SPI Data)
-TFT_DC = config.TFT_DC     # Data/Command
-TFT_CS = config.TFT_CS     # Chip Select
-TFT_RST = config.TFT_RST   # Reset
-
-# --- Initialize SPI and TFT ---
-spi = SPI(1, baudrate=20000000, polarity=0, phase=0,
-          sck=Pin(10), mosi=Pin(11))
-
-tft = ST7735(spi, 128, 160, Pin(12), Pin(13), Pin(14))
-tft.init()
+# Colors
 text_color = config.TEXT_COLOR
-# --- Display Utilities ---
+bg_color = config.BG_COLOR
+highlight_color = config.HIGHLIGHT_COLOR
 
-def clear():
-    tft.clear
+# --- Optimized Helpers ---
+def clear(force=False):
+    """Optimized clear that only updates if needed"""
+    if force or tft.framebuf.fill(bg_color):
+        tft.show()
 
-def test_display():
-    tft.fill(0)
-    tft.text("Display test", 10, 10, text_color)
-    tft.text("Time: {}".format(ticks_ms()), 10, 30, text_color)
-    tft.show()
+def header(title):
+    """Optimized header that only redraws changed areas"""
+    # Save previous header text if needed
+    tft.framebuf.fill_rect(0, 0, 128, 20, highlight_color)
+    tft.framebuf.text(title, 5, 5, bg_color)
 
+def center_text(text, y, color=text_color):
+    x = (128 - len(text) * 8) // 2
+    tft.framebuf.text(text, x, y, color)
+
+def line(y):
+    tft.framebuf.hline(0, y, 128, text_color)
+
+# --- Display Modes with Optimized Updates ---
 def show_mode(mode):
-    tft.fill(0)
-    tft.text("MODE:", 5, 5, text_color)
-    tft.text(mode.upper(), 5, 25, text_color)
+    tft.framebuf.fill(bg_color)
+    header("MODE")
+    center_text(mode.upper(), 60)
     tft.show()
 
 def show_logic(level):
-    tft.fill(0)
-    tft.text("LOGIC MODE", 5, 5, text_color)
-    tft.text("Level: {}".format("HIGH" if level else "LOW"), 5, 25, text_color)
+    # Only update changing parts
+    tft.framebuf.fill_rect(0, 20, 128, 140, bg_color)  # Clear only content area
+    header("LOGIC PROBE")
+    center_text("HIGH" if level else "LOW", 70, config.GREEN if level else config.RED)
     tft.show()
 
 def show_frequency(freq_hz):
-    tft.fill(0)
-    tft.text("FREQ MODE", 5, 5, text_color)
-    tft.text("Freq:", 5, 25, text_color)
-    tft.text("{} Hz".format(freq_hz), 5, 45, text_color)
-    tft.show()
+    tft.framebuf.fill_rect(0, 20, 128, 140, bg_color)
+    header("FREQUENCY")
+    line(25)
+    
+    if freq_hz >= 1000:
+        txt = "{:.2f} kHz".format(freq_hz / 1000)
+    else:
+        txt = "{} Hz".format(int(freq_hz))
 
+    center_text(txt, 70)
+    tft.show()
 def show_pulse(width_us):
-    tft.fill(0)
-    tft.text("PULSE WIDTH", 5, 5, text_color)
-    tft.text("Pulse:", 5, 25, text_color)
-    tft.text("{} us".format(width_us), 5, 45, text_color)
+    """Optimized pulse width display with partial updates"""
+    # Clear only content area (below header and line)
+    tft.framebuf.fill_rect(0, 26, 128, 134, bg_color)
+    header("PULSE WIDTH")
+    line(25)
+    
+    txt = "{} us".format(int(width_us))
+    center_text(txt, 70)
     tft.show()
 
 def show_duty_cycle(duty_percent, freq_hz):
-    tft.fill(0)
-    tft.text("DUTY CYCLE", 5, 5, text_color)
-    tft.text("Duty: {:.1f}%".format(duty_percent), 5, 25, text_color)
-    tft.text("Freq: {} Hz".format(int(freq_hz)), 5, 45, text_color)
-    tft.show()
+    """Optimized duty cycle display with minimal redraws"""
+    # Clear only the areas we'll modify
+    tft.framebuf.fill_rect(0, 26, 128, 94, bg_color)  # Below header to bottom
     
+    header("DUTY CYCLE")
+    line(25)
+    
+    # Draw bar graph (only redraw changed portion)
+    bar_width = int(duty_percent / 100 * 100)
+    # Clear old bar
+    tft.framebuf.fill_rect(14, 70, 100, 15, bg_color)
+    # Draw new bar
+    tft.framebuf.fill_rect(14, 70, bar_width, 15, highlight_color)
+    tft.framebuf.rect(14, 70, 100, 15, text_color)
+    
+    # Text (clear old text areas first)
+    tft.framebuf.fill_rect(50, 90, 40, 8, bg_color)
+    tft.framebuf.fill_rect(40, 110, 50, 8, bg_color)
+    tft.framebuf.text("{:.1f}%".format(duty_percent), 50, 90, text_color)
+    tft.framebuf.text("{:.0f}Hz".format(freq_hz), 40, 110, text_color)
+    tft.show()
+
 def show_rise_fall(rise_ns, fall_ns):
-    tft.fill(0)
-    tft.text("EDGE TIMES", 5, 5, text_color)
-    tft.text(f"Rise: {rise_ns} ns", 5, 25, text_color)
-    tft.text(f"Fall: {fall_ns} ns", 5, 45, text_color)
-    tft.show()
+    """Optimized edge timing display"""
+    # Clear only the text areas we'll use
+    tft.framebuf.fill_rect(0, 26, 128, 74, bg_color)  # Below line to bottom
     
+    header("EDGE TIMES")
+    line(25)
+    
+    # Clear old text areas
+    tft.framebuf.fill_rect(10, 60, 80, 8, bg_color)
+    tft.framebuf.fill_rect(10, 80, 80, 8, bg_color)
+    
+    tft.framebuf.text("Rise: {}ns".format(int(rise_ns)), 10, 60, text_color)
+    tft.framebuf.text("Fall: {}ns".format(int(fall_ns)), 10, 80, text_color)
+    tft.show()
+
 def show_edge_count(edges):
-    tft.fill(0)
-    tft.text("EDGE COUNT", 5, 5, text_color)
-    tft.text("Edges:", 5, 25, text_color)
-    tft.text("{}/s".format(edges), 5, 45, text_color)
-    tft.show()
+    """Optimized edge counter display"""
+    # Clear only center area where number appears
+    tft.framebuf.fill_rect(0, 26, 128, 134, bg_color)
     
-def show_number(num):
-    """MUST BE IN CPU MODE"""
-    tft.fill(0)
-    tft.text("Number: ", 5, 5, text_color)
-    tft.text("{}".format(num), 5, 45, text_color)
+    header("EDGE COUNT")
+    line(25)
+    
+    # Clear old text area
+    text = "{} edges/s".format(edges)
+    text_width = len(text) * 8
+    tft.framebuf.fill_rect((128 - text_width)//2, 70, text_width, 8, bg_color)
+    
+    center_text(text, 70)
     tft.show()
 
-
-
-
-
+def show_number(num):
+    """Optimized number display"""
+    # Clear only center area where number appears
+    tft.framebuf.fill_rect(0, 26, 128, 134, bg_color)
+    
+    header("NUMBER")
+    
+    # Clear old number area
+    num_str = str(num)
+    text_width = len(num_str) * 8
+    tft.framebuf.fill_rect((128 - text_width)//2, 70, text_width, 8, bg_color)
+    
+    center_text(num_str, 70)
+    tft.show()
