@@ -40,7 +40,15 @@ DEBOUNCE_US = 5000
 # Safe Mode ON = disables risky features (IRQs, timers, etc.)
 SAFE_MODE = False
 
-TEXT_COLOR = 0xFFFF #White
 
+
+# Color Palette for ST7735 TFT
+
+# config.py
+TEXT_COLOR = 0xFFFF       # White
+BG_COLOR = 0x0000         # Black
+HIGHLIGHT_COLOR = 0x001F  # Blue
+GREEN = 0x07E0            # Green
+RED = 0xF800              # Red
 
 
