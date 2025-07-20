@@ -15,7 +15,7 @@ import display
 display.clear()
 import logic
 from signal_analyzer import SignalAnalyzer
-analyzer = SignalAnalyzer(config.INPUT_PIN, mode="pio")  # "cpu" or "pio" (cpu for freq < 1kHz)
+analyzer = SignalAnalyzer(config.INPUT_PIN, mode="cpu")  # "cpu" or "pio" (cpu for freq < 1kHz)
 
 # Initialize IRQ only if not in safe mode
 if not config.SAFE_MODE:
