@@ -49,7 +49,7 @@ def _edge_handler(pin):
         _change_cb(level, now)
 
     # Notify async func
-    for hook in _async_hooks:
+    for hook in _async_hooks[:]:
         if hook['target'] == level:
             hook['triggered'] = True
 
