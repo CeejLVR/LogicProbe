@@ -17,16 +17,16 @@ class ST7735S:
         
         # Initialize SPI and pins from config
         self.spi = machine.SPI(1,
-                              baudrate=20_000_000,
-                              polarity=0,
-                              phase=0,
-                              sck=machine.Pin(config.TFT_SCK),
-                              mosi=machine.Pin(config.TFT_MOSI))
-        
+                            baudrate=20_000_000,
+                            polarity=0,
+                            phase=0,
+                            sck=machine.Pin(config.TFT_SCK),
+                            mosi=machine.Pin(config.TFT_MOSI))
+
         self.dc = machine.Pin(config.TFT_DC, machine.Pin.OUT)
         self.rst = machine.Pin(config.TFT_RST, machine.Pin.OUT)
         self.cs = machine.Pin(config.TFT_CS, machine.Pin.OUT)
-        
+    
         # Initialize display
         self.reset()
         self.init_display()

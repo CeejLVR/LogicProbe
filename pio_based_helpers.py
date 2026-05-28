@@ -166,3 +166,66 @@ class FrequencyMeasure:
         
         return avg_period_ns, freq_hz, edge_count
 
+
+# -----------------------------------------------------------------------------
+# Rotary Encoder (SM3)
+# -----------------------------------------------------------------------------
+# encoder.pio
+@rp2.asm_pio()
+def encoder():
+    wrap_target()
+    mov(x, invert(null))        # x = 0xFFFFFFFF
+    label("read")
+    in_(pins, 2)                # read both encoder pins into OSR
+    mov(y, isr)                 # y = old state
+    in_(pins, 2)                # read again for current state
+    mov(isr, y)                 # swap
+    jmp(x_dec, "continue")      # dummy delay for debounce
+    label("continue")
+    irq(block)                  # signal update
+    push(noblock)               # push encoded state
+    wrap()
+
+from machine import Pin
+
+class RotaryEncoder:
+    def __init__(self, pin_a, pin_b):
+        self.pin_a = Pin(pin_a, Pin.IN, Pin.PULL_UP)
+        self.pin_b = Pin(pin_b, Pin.IN, Pin.PULL_UP)
+
+        self.last_state = (self.pin_a.value() << 1) | self.pin_b.value()
+
+        self.position = 0
+
+        self.transition_table = {
+            0b0001:  1,
+            0b0010: -1,
+            0b0100: -1,
+            0b0111:  1,
+            0b1000:  1,
+            0b1011: -1,
+            0b1101: -1,
+            0b1110:  1
+        }
+
+    def read(self):
+        current_state = (self.pin_a.value() << 1) | self.pin_b.value()
+
+        transition = (self.last_state << 2) | current_state
+
+        self.last_state = current_state
+
+        movement = self.transition_table.get(transition, 0)
+
+        self.position += movement
+
+        # one full detent
+        if self.position >= 2:
+            self.position = 0
+            return 1
+
+        elif self.position <= -2:
+            self.position = 0
+            return -1
+
+        return 0

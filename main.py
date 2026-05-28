@@ -1,4 +1,4 @@
-from machine import Timer, Pin, PWM
+from machine import Pin, PWM
 import utime
 import config
 import uasyncio
@@ -14,15 +14,30 @@ print("SAFE MODE:", config.SAFE_MODE)
 import display
 display.clear()
 import logic
+from encoder import RotaryEncoder
 from signal_analyzer import SignalAnalyzer
-analyzer = SignalAnalyzer(config.INPUT_PIN, mode="cpu")  # "cpu" or "pio" (cpu for freq < 1kHz)
+analyzer = SignalAnalyzer(config.INPUT_PIN)
+encoder = RotaryEncoder(config.A_PIN, config.B_PIN)
+last_encoder_event = 0
+async def handle_encoder():
+    global last_encoder_event
+    while True:
+        delta = encoder.read()
+        if delta != 0:
+            now = utime.ticks_ms()
+            # 200ms UI debounce
+            if utime.ticks_diff(now, last_encoder_event) > 200:
+                last_encoder_event = now
+                switch_mode(delta)
+        await uasyncio.sleep_ms(1)
+
 
 # Initialize IRQ only if not in safe mode
 if not config.SAFE_MODE:
     logic.init_monitor()
 
 # Modes
-modes = ["logic", "frequency", "pulse", "duty", "edge_time", "edge_counter"]
+modes = ["logic", "frequency", "pulse", "duty", "edge_time"]
 current_mode = "logic"
 display.show_mode(current_mode)
 last_mode_change = utime.ticks_ms()
@@ -33,46 +48,27 @@ test_pwm.freq(5000)  # 5 kHz
 test_pwm.duty_u16(32768)  # 50%
 
 # Buttons
-mode_button = Pin(config.MODE_BUTTON_PIN, Pin.IN, Pin.PULL_UP)
-edge_count_button = Pin(config.EDGE_BUTTON_PIN, Pin.IN, Pin.PULL_UP)
 
 # Display control variables
 display_state = "normal"  # could be "normal" or "show_number"
 number_to_show = None
 
 # --- Mode Switching ---
-def switch_mode():
+def switch_mode(delta):
     global current_mode, last_mode_change, display_state
-    idx = (modes.index(current_mode) + 1) % len(modes)
+
+    now = utime.ticks_ms()
+
+    # debounce/cooldown
+    if utime.ticks_diff(now, last_mode_change) < 150:
+        return
+
+    idx = (modes.index(current_mode) + delta) % len(modes)
     current_mode = modes[idx]
-    last_mode_change = utime.ticks_ms()
-    display_state = "normal"  # Reset display state when switching modes
+
+    last_mode_change = now
+    display_state = "normal"
     display.show_mode(current_mode)
-
-async def monitor_mode_switch():
-    global last_mode_change
-    while True:
-        if not mode_button.value() and utime.ticks_diff(utime.ticks_ms(), last_mode_change) > 300:
-            switch_mode()
-        await uasyncio.sleep_ms(50)
-
-
-# --- Edge Counting Task ---
-async def monitor_button_for_edges():
-    global display_state, number_to_show
-    while True:
-        count = await analyzer.edge_count_while_held(edge_count_button)
-        if count is not None:
-            number_to_show = count
-            display_state = "show_number"
-            display.show_number(count)
-        await uasyncio.sleep_ms(300)  # Avoid double-trigger
-        
-async def poll_edge_counter():
-    while True:
-        analyzer.update()  # This calls CpuEdgeCounter.update() if in cpu mode
-        await uasyncio.sleep_ms(1)
-
 
 # --- Update Display ---
 async def periodic_update():
@@ -96,37 +92,14 @@ async def periodic_update():
             elif current_mode == "edge_time":
                 rise, fall = analyzer.rise_fall_times_ns()
                 display.show_rise_fall(round(rise, 2), round(fall, 2))
-            elif current_mode == "edge_counter":
-                edges = analyzer.edge_count()
-                display.show_number(edges)
-        await uasyncio.sleep_ms(100)  # Display update rate
-
-
-
-# Button to clear number display and return to normal display mode
-#               --not currently in use--
-async def monitor_clear_display_button():
-    global display_state
-    clear_button = Pin(config.CLEAR_DISPLAY_BUTTON_PIN, Pin.IN, Pin.PULL_UP)  # You'd need a button wired for this
-    while True:
-        if not clear_button.value() and display_state == "show_number":
-            display_state = "normal"
-            display.clear()
-            display.show_mode(current_mode)
-            await uasyncio.sleep_ms(500)  # Debounce
-        await uasyncio.sleep_ms(50)
+        await uasyncio.sleep_ms(300)  # Display update rate
 
 # --- Run everything ---
 async def main():
     tasks = [
-        monitor_mode_switch(),
-        monitor_button_for_edges(),
+        handle_encoder(),
         periodic_update(),
-        # monitor_clear_display_button(),  # Uncomment to use clear display button
-        poll_edge_counter(),
     ]
     await uasyncio.gather(*tasks)
 
 uasyncio.run(main())
-
-
