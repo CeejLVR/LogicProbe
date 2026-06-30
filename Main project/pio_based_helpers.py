@@ -164,7 +164,7 @@ class FrequencyMeasure:
         avg_period_ns = total_time_ns / edge_count   # Average period
         freq_hz = edge_count * 1000 / sample_time_ms  # Frequency
         
-        return avg_period_ns, freq_hz, edge_count
+        return avg_period_ns, (freq_hz * 2), edge_count
 
 
 # -----------------------------------------------------------------------------

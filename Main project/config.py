@@ -20,7 +20,7 @@ B_PIN = 9
 VREF = 3.3
 INPUT_THRESHOLD_LOW = 0.8  # Volts
 INPUT_THRESHOLD_HIGH = 2.0  # Volts
-MAX_INPUT_VOLTAGE = 5.0     # Volts
+MAX_INPUT_VOLTAGE = 3.3     # Volts
 
 TEST_PWM = True  # Set to True to enable test PWM output on pin 17 for testing purposes
 

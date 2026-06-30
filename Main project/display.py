@@ -99,16 +99,63 @@ def show_rise_fall(rise_ns, fall_ns):
     oled.text("Fall: {}ns".format(int(fall_ns)), 5, 45, WHITE)
     oled.show()
 
-def show_edge_count(edges):
-    oled.fill_rect(0, 16, 128, 48, BLACK)
-    header("EDGE COUNT")
-    line(20)
-    text = "{} edges/s".format(edges)
-    center_text(text, 40)
-    oled.show()
-
 def show_number(num):
     oled.fill_rect(0, 16, 128, 48, BLACK)
     header("NUMBER")
     center_text(str(num), 35)
+    oled.show()
+
+def show_logic_detail(level, direction=None, age_ms=None):
+    oled.fill_rect(0, 16, 128, 48, BLACK)
+    header("LOGIC PROBE")
+
+    status = "HIGH" if level else "LOW"
+    center_text(status, 25, WHITE)
+
+    if direction is None:
+        edge_text = "EDGE: none"
+    elif age_ms is None:
+        edge_text = "EDGE: {}".format(direction.upper())
+    else:
+        edge_text = "EDGE: {} {}ms".format(direction.upper(), age_ms)
+
+    center_text(edge_text, 48, WHITE)
+    oled.show()
+
+
+def show_voltage(voltage, state):
+    oled.fill_rect(0, 16, 128, 48, BLACK)
+    header("VOLTAGE")
+    line(20)
+
+    center_text("{:.2f} V".format(voltage), 32)
+    center_text(state, 50)
+    oled.show()
+
+
+def show_edge_count(count):
+    oled.fill_rect(0, 16, 128, 48, BLACK)
+    header("EDGE COUNT")
+    line(20)
+
+    center_text("{} edges".format(count), 38)
+    oled.show()
+
+
+def show_frequency_detail(freq_hz, min_hz=None, max_hz=None):
+    oled.fill_rect(0, 16, 128, 48, BLACK)
+    header("FREQUENCY")
+    line(20)
+
+    if freq_hz >= 1000:
+        main = "{:.2f} kHz".format(freq_hz / 1000)
+    else:
+        main = "{} Hz".format(int(freq_hz))
+
+    center_text(main, 28)
+
+    if min_hz is not None and max_hz is not None:
+        oled.text("L:{:.0f}".format(min_hz), 0, 52, WHITE)
+        oled.text("H:{:.0f}".format(max_hz), 64, 52, WHITE)
+
     oled.show()

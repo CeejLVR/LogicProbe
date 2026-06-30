@@ -1,10 +1,11 @@
-from machine import Pin
+from machine import Pin, ADC
 from pio_based_helpers import PrecisionPulse, EdgeTimer, FrequencyMeasure
 import config
 
 class SignalAnalyzer:
     def __init__(self, pin_num):
         self.pin = Pin(pin_num, Pin.IN)
+        self.adc = ADC(config.ADC_PIN)
         # PIO-based measurements
         self._pulse = PrecisionPulse(pin_num)
         self._edge = EdgeTimer(pin_num)
@@ -29,6 +30,7 @@ class SignalAnalyzer:
         period_ns, _, _ = self._freq.measure(sample_time_ms)
         return period_ns
 
+    # Edge Count not currently in use
     def edge_count(self, sample_time_ms=100):
         """Return number of edges counted during the sample time."""
         _, _, edges = self._freq.measure(sample_time_ms)
@@ -44,9 +46,26 @@ class SignalAnalyzer:
         
         duty = (pw_us * 1000) / period_ns * 100  # Convert us -> ns
         return round(duty, 1), freq_hz
+    
+    def voltage(self, samples=16):
+        total = 0
 
+        for _ in range(samples):
+            total += self.adc.read_u16()
 
-    def update(self):
-        self._edge_counter.update()
-        self.edge_button_result = self._edge_counter.get_result()
+        raw = total / samples
+        return round((raw / 65535) * config.VREF, 2)
+
+    def voltage_state(self, voltage=None):
+        if voltage is None:
+            voltage = self.voltage()
+
+        if voltage < config.INPUT_THRESHOLD_LOW:
+            return "LOW"
+
+        if voltage > config.INPUT_THRESHOLD_HIGH:
+            return "HIGH"
+
+        return "MID"
+
 
