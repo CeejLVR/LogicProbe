@@ -17,7 +17,7 @@ import logic
 from encoder import RotaryEncoder
 from signal_analyzer import SignalAnalyzer
 analyzer = SignalAnalyzer(config.INPUT_PIN)
-encoder = RotaryEncoder(config.A_PIN, config.B_PIN)
+encoder = RotaryEncoder(config.A_PIN, config.B_PIN, config.PSH_BTN)
 last_encoder_event = 0
 async def handle_encoder():
     global last_encoder_event
@@ -43,9 +43,11 @@ display.show_mode(current_mode)
 last_mode_change = utime.ticks_ms()
 
 # Test PWM generator (use scope to verify)
-test_pwm = PWM(Pin(17))
-test_pwm.freq(5000)  # 5 kHz
-test_pwm.duty_u16(32768)  # 50%
+if config.TEST_PWM:
+    test_pwm = PWM(Pin(17))
+    test_pwm.freq(5000)  # 5 kHz
+    test_pwm.duty_u16(32768)  # 50%
+
 
 # Buttons
 

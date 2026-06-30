@@ -4,10 +4,11 @@ import utime
 
 class RotaryEncoder:
 
-    def __init__(self, pin_clk, pin_dt):
+    def __init__(self, pin_clk, pin_dt, pin_sw):
 
         self.clk = Pin(pin_clk, Pin.IN, Pin.PULL_UP)
         self.dt = Pin(pin_dt, Pin.IN, Pin.PULL_UP)
+        self.sw = Pin(pin_sw, Pin.IN, Pin.PULL_UP) 
 
         self.last_clk = self.clk.value()
 

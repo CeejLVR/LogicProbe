@@ -11,11 +11,6 @@ class SignalAnalyzer:
         self._freq = FrequencyMeasure(pin_num)
 
 
-    def set_mode(self, mode):
-        if mode == self.mode:
-            return
-        self.__init__(self.pin.id(), mode=mode)  # Reinitialize with new mode
-
     def pulse_width_us(self, samples=15):
         """Measure high pulse width in microseconds."""
         return self._pulse.measure(samples)

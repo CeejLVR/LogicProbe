@@ -22,13 +22,16 @@ INPUT_THRESHOLD_LOW = 0.8  # Volts
 INPUT_THRESHOLD_HIGH = 2.0  # Volts
 MAX_INPUT_VOLTAGE = 5.0     # Volts
 
+TEST_PWM = True  # Set to True to enable test PWM output on pin 17 for testing purposes
+
+
 
 # PIO Configuration
 PIO_FREQ = 125_000_000    # 125MHz (1 clock cycle = 8ns)
 DEFAULT_TIMEOUT_MS = 1000  # Timeout after a full second
 CLOCK_NS = 8              # Time for one clock cycle at 125MHz
 
-DEBOUNCE_US = 5000
+DEBOUNCE_US = 50
 
 # Safe Mode ON = disables risky features (IRQs, timers, etc.)
 SAFE_MODE = False
